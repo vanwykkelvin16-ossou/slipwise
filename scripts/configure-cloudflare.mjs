@@ -1,0 +1,12 @@
+import {readFileSync,writeFileSync} from 'node:fs';
+import {resolve} from 'node:path';
+const id=process.env.CLOUDFLARE_D1_DATABASE_ID;
+if(!id || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(id) || id==='00000000-0000-4000-8000-000000000000')throw new Error('Set CLOUDFLARE_D1_DATABASE_ID to your real slips-wise-db database ID. See CLOUDFLARE.md.');
+const file=new URL('../dist/server/wrangler.json',import.meta.url);
+const config=JSON.parse(readFileSync(file,'utf8'));
+config.name='slips-wise';config.topLevelName='slips-wise';config.workers_dev=true;
+config.d1_databases=[{binding:'DB',database_name:'slips-wise-db',database_id:id,migrations_dir:resolve('drizzle')}];
+config.r2_buckets=[{binding:'BUCKET',bucket_name:'slips-wise-files'}];
+config.assets={...config.assets,directory:'../client'};
+writeFileSync(file,JSON.stringify(config,null,2)+'\n');
+console.log('Configured slips-wise with DB and private BUCKET bindings.');

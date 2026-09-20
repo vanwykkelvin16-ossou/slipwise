@@ -13,7 +13,7 @@ A mobile-first business receipt PWA built with React/Vinext, Cloudflare D1 and p
 
 ## Data and hosting
 
-Deploy this repository into your own Cloudflare account using [CLOUDFLARE.md](CLOUDFLARE.md). It includes the complete application, bundled OCR assets and SQL migrations. Configure D1 `DB`, private R2 `BUCKET`, and the admin bootstrap secret before accepting customers. Existing Sites account/receipt data is not included in this source export.
+Deploy this source using [CLOUDFLARE.md](CLOUDFLARE.md). Configure D1 `DB`, private R2 `BUCKET` and the admin bootstrap secret in your own account. Source export does not include existing Sites customer records or receipts.
 
 ## Verification
 
