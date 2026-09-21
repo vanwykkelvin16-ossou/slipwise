@@ -2,6 +2,12 @@
 
 A mobile-first business receipt PWA built with React/Vinext, Cloudflare D1 and private R2 object storage. Currency: ZAR.
 
+## Deploy to Cloudflare
+
+Follow [CLOUDFLARE.md](CLOUDFLARE.md) for the manual setup. Use Worker `slipwise`, build command `pnpm run build:cloudflare` and deploy command `pnpm run deploy:cloudflare`. Create D1 `slips-wise-db` and private R2 `slips-wise-files`, and add your D1 UUID as the build variable `CLOUDFLARE_D1_DATABASE_ID`. The deploy helper validates the bundle and applies migrations before publishing.
+
+Use `pnpm run check:cloudflare` after building for a dry run that does not publish or migrate remote data.
+
 ## Features
 
 - Business owner signup, password hashing with unique salts, persistent 30-day HttpOnly sessions, rate limits and same-origin mutation checks.

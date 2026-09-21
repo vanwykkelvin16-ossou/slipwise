@@ -1,55 +1,97 @@
 # Deploy Slipwise to Cloudflare
 
-This is the complete Slipwise app: Cloudflare Worker, D1 database, private R2 storage, local OCR and PWA. Source export does not copy existing users, sessions or receipts from Sites. Plan a separate data migration before moving existing customers.
+This repository deploys the Slipwise app to the Cloudflare Worker **slipwise**. It includes the application, OCR assets, SQL migrations and deployment scripts. Existing users and receipts on Sites are not copied by a source deployment.
 
-## Create resources
+## 1. Prepare your Cloudflare resources
 
-1. Create D1 database `slips-wise-db` and copy its database ID.
-2. Create R2 bucket `slips-wise-files`. Keep public/r2.dev access disabled. All receipt access is authenticated through the Worker.
-3. R2 activation may require billing setup. Workers, D1 and R2 have separate usage limits; a free address does not mean unlimited free storage or hosting.
+In the same Cloudflare account as the Worker:
 
-## Connect GitHub in Workers & Pages
+1. Open **Storage & databases > D1 SQL Database**. Create `slips-wise-db` if it does not already exist. Copy its **Database ID** from the overview.
+2. Open **Storage & databases > R2 Object Storage**. Create `slips-wise-files` if it does not already exist. Keep its public development URL disabled and do not attach a public custom domain. The app serves receipts through authenticated routes.
+3. If Cloudflare asks you to activate R2 or accept billing terms, complete that directly in your account. These services have separate usage limits.
 
-Select `vanwykkelvin16-ossou/slipwise` and use:
+Reuse existing resources with these names. Do not delete or recreate a database containing user data.
+
+## 2. Set the Worker build settings
+
+Open **Workers & Pages > slipwise > Settings > Build**. Connect `vanwykkelvin16-ossou/slipwise` and set:
 
 | Setting | Value |
 | --- | --- |
 | Worker name | `slipwise` |
 | Production branch | `main` |
-| Root | Repository root (`/`) |
+| Root directory | `/` |
 | Build command | `pnpm run build:cloudflare` |
 | Deploy command | `pnpm run deploy:cloudflare` |
-| Build variable `CLOUDFLARE_D1_DATABASE_ID` | Your real D1 database ID |
+| Build variable name | `CLOUDFLARE_D1_DATABASE_ID` |
+| Build variable value | The real Database ID copied from `slips-wise-db` |
 | Node version | 22.13 or newer |
-| Package manager | pnpm 11.25.0, from package.json |
+| Package manager | pnpm 11.25.0, declared in package.json |
 
-Use the checked-in lockfile. The deployment credential needs access to the Worker, D1 migrations and R2 bucket in your account. The build writes the generated `dist/server/wrangler.json` with DB and BUCKET bindings; deploy applies SQL migrations first. Only dist/client is served publicly. Missing database configuration stops deployment with an explicit error.
+Add the database ID under **Build variables and secrets**, not only runtime Variables & Secrets. Enter the UUID without quotation marks. Do not enter the database name or a sample ID.
 
-Use the workers.dev address shown on the `slipwise` Worker after a successful deployment. The Sites slug `slips-wise` is separate from the Cloudflare Worker name.
+Use the checked-in pnpm lockfile. The build token must have access to this account's Worker, D1 and R2 resources, including D1 edit permission to apply migrations. A default build token may need D1 permission added in Cloudflare.
 
-## Repair the failed dashboard build
+Save the settings, then trigger a deployment of the latest `main` commit. A build for an older commit will not contain the latest fixes.
 
-Open Workers & Pages > slipwise > Settings > Build. Set the build and deploy commands to the values above. The generic `pnpm run build` skips the production binding configuration, and plain `npx wrangler deploy` skips the migration helper.
+The source cannot change these dashboard settings or create account resources by being pushed to GitHub.
 
-Under Build variables and secrets, add `CLOUDFLARE_D1_DATABASE_ID` using the ID from the `slips-wise-db` D1 database overview. This is a build variable, not a runtime secret. Ensure `slips-wise-db` and the private `slips-wise-files` R2 bucket exist in the same account. Keep those resource names unchanged.
+## 3. What the scripts do
 
-Deploy the latest `main` commit after saving the settings. If it fails, inspect the final lines of the deploy log. A D1 authorization error requires a build token with D1 edit access; an R2-not-found error requires the named bucket. Never substitute a placeholder database ID.
+- `build:cloudflare` checks the database ID before compiling. It builds the app and configures the generated `dist/server/wrangler.json` for Worker `slipwise`, database binding `DB`, and storage binding `BUCKET`.
+- `deploy:cloudflare` checks the generated files and reapplies the account bindings. It runs a Wrangler dry run, applies pending D1 SQL migrations, and then publishes the Worker. A failed check or migration stops the deployment.
+- `check:cloudflare` checks the built package with Wrangler's `--dry-run`. It does not apply remote migrations or publish a Worker.
 
-## Configure admin
+Only `dist/client` is served as public static assets. The migration path is relative to the generated config so it remains valid across build machines. Do not upload the repository root as a static website.
 
-Administrator email: `kelvin@sabroking.co.za`. No actual password or admin password hash is committed. Admin bootstrap requires the Worker secret `ADMIN_PASSWORD_HASH`.
+Use the Cloudflare-specific commands above. Plain `npx wrangler deploy` skips the database migration helper. A generic build followed by `deploy:cloudflare` is supported, but `build:cloudflare` gives earlier configuration errors.
 
-In your local checkout with dependencies installed:
+## 4. Optional deployment from your own terminal
+
+With Node and pnpm installed:
 
 ```sh
-npx wrangler login
-npm run admin:setup
+git clone https://github.com/vanwykkelvin16-ossou/slipwise.git
+cd slipwise
+pnpm install --frozen-lockfile
+pnpm exec wrangler login
+export CLOUDFLARE_D1_DATABASE_ID='PASTE_YOUR_REAL_DATABASE_ID'
+pnpm run build:cloudflare
+pnpm run check:cloudflare
+pnpm run deploy:cloudflare
 ```
 
-The helper requests a password with hidden input, derives a uniquely salted PBKDF2 hash and sends it directly to the Cloudflare Worker secret. It never prints or saves the password/hash. Use the agreed initial password or choose a stronger one. Never add it to public source or NEXT_PUBLIC variables. First successful admin login creates the database admin. For an existing administrator, rotating the bootstrap secret alone does not change the stored password: update that admin database hash and revoke sessions separately.
+The export command is for macOS/Linux shells. Keep the real value in your terminal environment or Cloudflare build settings; do not commit credentials.
 
-## Verify after deployment
+## 5. Set up the admin portal
 
-Test signup/login/sign-out, persistent sessions, scanning images/PDFs, reviewing and saving, editing/deleting, private downloads, bulk ZIP/PDF/CSV and admin contacts-only access. Test iPhone/Android installation and camera capture on physical devices. The original app and secret-based export passed 29 isolated backend checks, TypeScript, production build and a Wrangler deployment dry run before export. New-account live deployment has not yet been tested.
+After deploying, use your local checkout to set the initial admin password:
 
-Official build documentation: https://developers.cloudflare.com/workers/ci-cd/builds/configuration/
+```sh
+pnpm run admin:setup
+```
+
+Sign in to Wrangler first as shown above. The helper prompts twice with hidden input, derives a uniquely salted PBKDF2 hash and writes the `ADMIN_PASSWORD_HASH` secret to Worker `slipwise`. It does not print or save the password or hash. Do not put a plaintext password into this secret.
+
+Admin email: `kelvin@sabroking.co.za`. Admin login will not work until this secret is configured. First successful admin login creates the admin database record. Changing the bootstrap secret alone does not rotate an existing admin's stored password.
+
+## Troubleshooting
+
+| Error or symptom | Action |
+| --- | --- |
+| Missing/invalid `CLOUDFLARE_D1_DATABASE_ID` | Add the real D1 UUID to build variables, then run a new build. |
+| Missing `dist/server` files | Use `pnpm run build:cloudflare` from repository root. |
+| Worker name mismatch | Keep the dashboard Worker name as `slipwise`. The Sites slug `slips-wise` is separate. |
+| D1 permission or authorization failure | Check the build token's account and D1 edit permission. |
+| Database does not exist | Confirm the D1 UUID belongs to `slips-wise-db` in this account. |
+| R2 bucket not found / R2 not enabled | Activate R2 if needed and create the private `slips-wise-files` bucket. |
+| Table already exists during migration | Stop and inspect existing schema/migration history; do not delete customer data or blindly rerun SQL. |
+| Admin login fails | Run the admin setup helper; verify the secret belongs to Worker `slipwise`. |
+
+## Verification
+
+On 21 September 2026, this revision passed a production build, TypeScript checking, a Wrangler deployment dry run and the initial SQL migration against a local D1 database. Those checks used a synthetic database ID for local validation only. They do not verify your Cloudflare account permissions, resource existence or live deployment.
+
+After deployment, open the workers.dev URL shown by Cloudflare. Test signup, sign-in, saving a receipt, viewing/downloading it, exports and admin sign-in. Check that one user's private files cannot be accessed by another user. Test PWA installation and camera capture on physical iPhone/Android devices.
+
+References: [Workers build settings](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/) and [D1 migrations](https://developers.cloudflare.com/d1/reference/migrations/).
