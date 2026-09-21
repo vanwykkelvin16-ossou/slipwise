@@ -14,18 +14,26 @@ Select `vanwykkelvin16-ossou/slipwise` and use:
 
 | Setting | Value |
 | --- | --- |
-| Worker name | `slips-wise` |
+| Worker name | `slipwise` |
 | Production branch | `main` |
 | Root | Repository root (`/`) |
-| Build command | `npm run build:cloudflare` |
-| Deploy command | `npm run deploy:cloudflare` |
+| Build command | `pnpm run build:cloudflare` |
+| Deploy command | `pnpm run deploy:cloudflare` |
 | Build variable `CLOUDFLARE_D1_DATABASE_ID` | Your real D1 database ID |
 | Node version | 22.13 or newer |
 | Package manager | pnpm 11.25.0, from package.json |
 
 Use the checked-in lockfile. The deployment credential needs access to the Worker, D1 migrations and R2 bucket in your account. The build writes the generated `dist/server/wrangler.json` with DB and BUCKET bindings; deploy applies SQL migrations first. Only dist/client is served publicly. Missing database configuration stops deployment with an explicit error.
 
-The intended address is `slips-wise.vanwykkelvin16.workers.dev`; confirm the actual address after successful deployment.
+Use the workers.dev address shown on the `slipwise` Worker after a successful deployment. The Sites slug `slips-wise` is separate from the Cloudflare Worker name.
+
+## Repair the failed dashboard build
+
+Open Workers & Pages > slipwise > Settings > Build. Set the build and deploy commands to the values above. The generic `pnpm run build` skips the production binding configuration, and plain `npx wrangler deploy` skips the migration helper.
+
+Under Build variables and secrets, add `CLOUDFLARE_D1_DATABASE_ID` using the ID from the `slips-wise-db` D1 database overview. This is a build variable, not a runtime secret. Ensure `slips-wise-db` and the private `slips-wise-files` R2 bucket exist in the same account. Keep those resource names unchanged.
+
+Deploy the latest `main` commit after saving the settings. If it fails, inspect the final lines of the deploy log. A D1 authorization error requires a build token with D1 edit access; an R2-not-found error requires the named bucket. Never substitute a placeholder database ID.
 
 ## Configure admin
 

@@ -12,5 +12,5 @@ const confirm=await secret('Confirm password (hidden): ');prompt.close();
 if(password!==confirm||password.length<8||password.length>128)throw new Error('Passwords must match and contain 8–128 characters.');
 const salt=randomBytes(16).toString('hex');
 const hash=`pbkdf2$100000$${salt}$${pbkdf2Sync(password,salt,100000,32,'sha256').toString('hex')}`;
-const result=spawnSync(process.execPath,['node_modules/wrangler/bin/wrangler.js','secret','put','ADMIN_PASSWORD_HASH','--name','slips-wise'],{input:hash+'\n',stdio:['pipe','inherit','inherit']});
+const result=spawnSync(process.execPath,['node_modules/wrangler/bin/wrangler.js','secret','put','ADMIN_PASSWORD_HASH','--name','slipwise'],{input:hash+'\n',stdio:['pipe','inherit','inherit']});
 if(result.error)throw result.error;process.exit(result.status??1);
